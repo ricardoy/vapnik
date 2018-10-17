@@ -42,8 +42,8 @@ def main():
     noise = 0.
     a = 1
     b = 1
-    c = 1
-    d = 1
+    c = -1
+    d = 2
     plot_plane(a, b, c, d, ax)
 
 

@@ -1,3 +1,5 @@
+from mpl_toolkits.mplot3d import axes3d
+import matplotlib.pyplot as plt
 import numpy as np
 
 from vapnik.perceptron import PerceptronVC1
@@ -24,26 +26,31 @@ def pocket_perceptron(X, Y, epochs):
     return p
 
 
+def plot_plane(a, b, c, d, ax, color):
+    x, y, z = get_plane_points(a, b, c, d)
+    ax.plot_surface(x, y, z, alpha=0.2, color=color)
+
+
 def main():
     a = 1
     b = -1
-    c = 2
-    d = -3
+    c = -3
+    d = 7
     n = 1000
 
     epochs = 10
     noise = 0.0
 
-    x, y, z = sample_points(a, b, c, d, n=n, side=1, noise=noise)
-    X_pos = np.stack((x, y, z), axis=-1)
-    y_pos = np.ones(n, dtype=np.int)
+    x_pos, y_pos, z_pos = sample_points(a, b, c, d, n=n, side=1, noise=noise)
+    X_pos = np.stack((x_pos, y_pos, z_pos), axis=-1)
+    Y_pos = np.ones(n, dtype=np.int)
 
-    x, y, z = sample_points(a, b, c, d, n=n, side=-1, noise=noise)
-    X_neg = np.stack((x, y, z), axis=-1)
-    y_neg = -1 * np.ones(n, dtype=np.int)
+    x_neg, y_neg, z_neg = sample_points(a, b, c, d, n=n, side=-1, noise=noise)
+    X_neg = np.stack((x_neg, y_neg, z_neg), axis=-1)
+    Y_neg = -1 * np.ones(n, dtype=np.int)
 
     X = np.concatenate((X_pos, X_neg), axis=0)
-    Y = np.concatenate((y_pos, y_neg), axis=0)
+    Y = np.concatenate((Y_pos, Y_neg), axis=0)
 
     ones = np.reshape(np.array(np.ones(2*n)), (2*n, 1))
 
@@ -62,6 +69,23 @@ def main():
     print(ok / total)
 
     print(p.weights)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    plot_plane(a, b, c, d, ax, 'r')
+
+    d, a, b, c = p.weights
+    plot_plane(a, b, c, d, ax, 'g')
+
+    ax.scatter(x_pos, y_pos, z_pos, c='r', marker='o')
+    ax.scatter(x_neg, y_neg, z_neg, c='b', marker='^')
+    # print(z_pos)
+
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+
+    plt.show()
 
 
 if __name__ == '__main__':

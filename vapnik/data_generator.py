@@ -1,7 +1,7 @@
 import numpy as np
 
 
-K = 1000
+K = 10
 
 
 def randrange(n, vmin, vmax):
@@ -19,16 +19,16 @@ def sample_points(a, b, c, d, side=1, noise=0.1, n=10):
     y = randrange(n, -K, K)
     z = (-a*x -b*y -d) / c
 
-    alpha = randrange(n, 0, K/2)
+    keep_class_flag = randrange(n, 0, K/2)
 
     if side == 1:
         v = np.random.choice([1, -1], p=[1-noise, noise], size=n)
     else:
         v = np.random.choice([1, -1], p=[noise, 1-noise], size=n)
 
-    x = x + v * alpha * a
-    y = y + v * alpha * b
-    z = z + v * alpha * c
+    x = x + v * keep_class_flag * a
+    y = y + v * keep_class_flag * b
+    z = z + v * keep_class_flag * c
 
     return x, y, z
 
