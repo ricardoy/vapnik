@@ -32,10 +32,10 @@ def plot_plane(a, b, c, d, ax, color):
 
 
 def main():
-    a = 1
-    b = -1
-    c = -3
-    d = 7
+    a = -1
+    b = -2
+    c = 3
+    d = 10
     n = 1000
 
     epochs = 10
