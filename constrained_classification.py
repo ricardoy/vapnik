@@ -34,7 +34,7 @@ def plot_plane(a, b, c, d, ax, color):
 def main():
     a = -1
     b = -2
-    c = 3
+    c = -2
     d = 10
     n = 1000
 
@@ -54,7 +54,7 @@ def main():
 
     ones = np.reshape(np.array(np.ones(2*n)), (2*n, 1))
 
-    X = np.append(ones, X, axis=1)
+    X = np.append(X, ones, axis=1)
 
     p = pocket_perceptron(X, Y, epochs)
 
@@ -74,7 +74,7 @@ def main():
     ax = fig.add_subplot(111, projection='3d')
     plot_plane(a, b, c, d, ax, 'r')
 
-    d, a, b, c = p.weights
+    a, b, c, d = p.weights
     plot_plane(a, b, c, d, ax, 'g')
 
     ax.scatter(x_pos, y_pos, z_pos, c='r', marker='o')
