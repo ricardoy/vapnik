@@ -1,9 +1,8 @@
 import numpy as np
-from math import sqrt
 
 
 class Perceptron(object):
-    def __init__(self, n, learning_rate=1e-2):
+    def __init__(self, n, learning_rate=1e-1):
         self.weights = np.random.normal(size=n+1)
         self.learning_rate = learning_rate
 
@@ -31,7 +30,7 @@ class Perceptron(object):
 
 
 class PerceptronVC1(Perceptron):
-    def __init__(self, n, learning_rate=1e-2):
+    def __init__(self, n, learning_rate=1e-1):
         Perceptron.__init__(self, n, learning_rate)
         self.weights = np.zeros(n+1)
         v1 = np.array([1, 1, 1, 0], dtype=np.float)
@@ -49,7 +48,6 @@ class PerceptronVC1(Perceptron):
         new_weights = self.weights + delta
 
         self.weights = np.dot(self.v1, new_weights)*self.v1 + np.dot(self.v2, new_weights)*self.v2
-        # self.weights = new_weights
 
 
 class PerceptronGeneral(Perceptron):
@@ -69,8 +67,6 @@ class PerceptronGeneral(Perceptron):
 
         delta = self.learning_rate * (y - y_hat) * X
         new_weights = self.weights + delta
-
-        # self.weights = np.dot(self.v1, new_weights)*self.v1 + np.dot(self.v2, new_weights)*self.v2
 
         aux = np.dot(self.kernel[0], new_weights)*self.kernel[0]
         for i in range(1, len(self.kernel)):

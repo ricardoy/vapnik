@@ -1,7 +1,7 @@
 import numpy as np
 
 
-K = 10
+K = 1000
 
 
 def randrange(n, vmin, vmax):
@@ -19,16 +19,16 @@ def sample_points(a, b, c, d, side=1, noise=0.1, n=10):
     y = randrange(n, -K, K)
     z = (-a*x -b*y -d) / c
 
-    keep_class_flag = randrange(n, 0, K/2)
+    distance_to_hyperplane = randrange(n, 0, K/2)
 
     if side == 1:
-        v = np.random.choice([1, -1], p=[1-noise, noise], size=n)
+        keep_label = np.random.choice([1, -1], p=[1-noise, noise], size=n)
     else:
-        v = np.random.choice([1, -1], p=[noise, 1-noise], size=n)
+        keep_label = np.random.choice([1, -1], p=[noise, 1-noise], size=n)
 
-    x = x + v * keep_class_flag * a
-    y = y + v * keep_class_flag * b
-    z = z + v * keep_class_flag * c
+    x = x + keep_label * distance_to_hyperplane * a
+    y = y + keep_label * distance_to_hyperplane * b
+    z = z + keep_label * distance_to_hyperplane * c
 
     return x, y, z
 
