@@ -3,16 +3,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from tqdm import tqdm
-from vapnik.perceptron import PerceptronGeneral
+from vapnik.perceptron import Perceptron
 from vapnik.data_generator import get_plane_points, sample_points
 from sklearn.model_selection import train_test_split
 
 DIMENSION = 4
 
-va = np.array([1, 0, 0, 0])
-vb = np.array([0, 1, 0, 0])
-vc = np.array([0, 0, 1, 0])
-vd = np.array([0, 0, 0, 1])
+va = np.array([True, 0, 0, 0], dtype=np.bool)
+vb = np.array([0, True, 0, 0], dtype=np.bool)
+vc = np.array([0, 0, True, 0], dtype=np.bool)
+vd = np.array([0, 0, 0, True], dtype=np.bool)
 
 KERNELS = {
     1: [
@@ -82,8 +82,8 @@ KERNELS = {
 }
 
 
-def pocket_perceptron(X, Y, kernel, epochs):
-    p = PerceptronGeneral(3, kernel)
+def pocket_perceptron(X, Y, epochs):
+    p = Perceptron(X.shape[1])
 
     best_result = -1
     best_weights = None
@@ -108,28 +108,40 @@ def plot_plane(a, b, c, d, ax, color):
     ax.plot_surface(x, y, z, alpha=0.2, color=color)
 
 
-def experiment(verbose=True):
+def convert_X(X, kernels):
+    cols = []
+    for kernel in kernels:
+        col = np.sum(X * kernel, axis=-1)
+        cols.append(col)
+
+    result = np.stack(cols, axis=-1)
+    return result
+
+
+def run_all_experiments(verbose=True):
     a = 502
     b = 6332
     c = -100
     d = -3222
-    n = 200 # train size 600
-    train_size = 10
+    n = 4000
+    train_size = 5
 
     if verbose:
         print('Objective: ', (a, b, c, d))
 
-    epochs = 10
+    epochs = 200
     noise = 0.4
 
-    X, Y = generate_dataset(a, b, c, d, n, noise)
+    X, Y = generate_dataset(a, b, c, d, n//2, noise)
 
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = (2*n - train_size), random_state = 42, stratify=Y)
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = (n - train_size), random_state = 42, stratify=Y)
 
     if verbose:
-        print('total', X.shape, 'train', X_train.shape, 'test', X_test.shape)
+        print('n', X.shape, 'train', X_train.shape, 'test', X_test.shape)
 
-    scores = []
+    best_scores = []
+    all_eins = []
+    all_eouts = []
     for vc in [1, 2, 3, 4]:
 
         if verbose:
@@ -138,15 +150,21 @@ def experiment(verbose=True):
         min_eout = float('inf')
         associated_ein = None
         for representation, kernel in KERNELS[vc]:
-            p = pocket_perceptron(X_train, Y_train, kernel, epochs)
+            X_train_converted = convert_X(X_train, kernel)
+            p = pocket_perceptron(X_train_converted, Y_train, epochs)
 
-            predicted = p.predict_batch(X_train)
+            predicted = p.predict_batch(X_train_converted)
             ein = np.sum(predicted != Y_train) / (Y_train.shape[0])
             # ein = np.sum(predicted != Y_train)
 
-            predicted = p.predict_batch(X_test)
+            all_eins.append((vc, ein))
+
+            X_test_converted = convert_X(X_test, kernel)
+            predicted = p.predict_batch(X_test_converted)
             eout = np.sum(predicted != Y_test) / (Y_test.shape[0])
             # eout = np.sum(predicted != Y_test)
+
+            all_eouts.append((vc, eout))
 
             if eout < min_eout:
                 min_eout = eout
@@ -155,14 +173,15 @@ def experiment(verbose=True):
             if verbose:
                 print('%s | ein: %.4f | eout: %.4f' % (representation, ein, eout), '|', p.weights)
 
-            a, b, c, d = p.weights
-        scores.append((associated_ein, min_eout))
+            # a, b, c, d = p.weights
+        best_scores.append((associated_ein, min_eout))
 
-    eins = np.array([x[0] for x in scores])
-    eouts = np.array([x[1] for x in scores])
+    eins = np.array([x[0] for x in best_scores])
+    eouts = np.array([x[1] for x in best_scores])
 
     if verbose:
-        plot_graphic(eins, eouts)
+        plot_scatter(all_eins, all_eouts, a, b, c, d, noise)
+        # plot_graphic(eins, eouts)
 
     return eins, eouts
 
@@ -179,6 +198,34 @@ def generate_dataset(a, b, c, d, n, noise):
     ones = np.reshape(np.array(np.ones(2 * n)), (2 * n, 1))
     X = np.append(X, ones, axis=1)
     return X, Y
+
+
+def plot_scatter(all_eins, all_eouts, a, b, c, d, noise):
+    x = [t[0] for t in all_eins]
+    y = [t[1] for t in all_eins]
+
+    fig = plt.figure()
+    fig.suptitle('%.1fx %+.1fy %+.1fz %+.1f, noise=%.2f' % (a, b, c, d, noise))
+    ax = fig.add_subplot(111)
+    ax.scatter(x, y, label='Ein', marker='o', alpha=0.2)
+
+    y = [t[1] for t in all_eouts]
+    ax.scatter(x, y, label='Eout', marker='^', alpha=0.2)
+
+    ax.legend()
+    ax.set_ylim([0, 1.])
+    ax.set_ylabel('Error')
+    ax.set_xlabel('VC-dimension')
+    ax.tick_params(axis='x', which='major', labelsize=8)
+    # plt.xticks()
+
+    # for x, y in zip(interval, eouts):
+    #     ax.annotate('%.5f'%(y), xy=(x, y))
+    #
+    # for x, y in zip(interval, eins):
+    #     ax.annotate('%.5f'%(y), xy=(x, y))
+
+    plt.show()
 
 
 def plot_graphic(eins, eouts):
@@ -210,7 +257,7 @@ def main():
     avg_eouts = np.zeros(DIMENSION)
     n = 100
     for _ in tqdm(range(n)):
-        eins, eouts = experiment(False)
+        eins, eouts = run_all_experiments(False)
         avg_eins = avg_eins + eins/n
         avg_eouts = avg_eouts + eouts/n
 
@@ -218,5 +265,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    # experiment()
+    # main()
+    run_all_experiments()
