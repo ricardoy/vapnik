@@ -87,6 +87,7 @@ def pocket_perceptron(X, Y, epochs):
 
     best_result = -1
     best_weights = None
+
     for _ in range(epochs):
         for x, y in zip(X, Y):
             p.fit(x, y)
@@ -118,19 +119,40 @@ def convert_X(X, kernels):
     return result
 
 
+def plot_hyperplanes(a, b, c, d, p, X, Y):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    plot_plane(a, b, c, d, ax, 'r')
+
+    a, b, c, d = p.weights
+    plot_plane(a, b, c, d, ax, 'g')
+
+    X_pos = X[Y == 1]
+    ax.scatter(X_pos[:,0], X_pos[:,1], X_pos[:,2], c='r', marker='o')
+    X_neg = X[Y == -1]
+    ax.scatter(X_neg[:,0], X_neg[:,1], X_neg[:,2], c='b', marker='^')
+    # print(z_pos)
+
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+
+    plt.show()
+
+
 def run_all_experiments(verbose=True):
-    a = 502
-    b = 6332
-    c = -100
-    d = -3222
+    a = 1
+    b = 1
+    c = 1
+    d = 1
     n = 4000
-    train_size = 5
+    train_size = 20
 
     if verbose:
         print('Objective: ', (a, b, c, d))
 
-    epochs = 200
-    noise = 0.4
+    epochs = 100
+    noise = 0.
 
     X, Y = generate_dataset(a, b, c, d, n//2, noise)
 
@@ -142,14 +164,14 @@ def run_all_experiments(verbose=True):
     best_scores = []
     all_eins = []
     all_eouts = []
-    for vc in [1, 2, 3, 4]:
+    for n_param in [1, 2, 3, 4]:
 
         if verbose:
-            print('VC: %d' % (vc))
+            print('# parameters: %d' % (n_param))
 
         min_eout = float('inf')
         associated_ein = None
-        for representation, kernel in KERNELS[vc]:
+        for representation, kernel in KERNELS[n_param]:
             X_train_converted = convert_X(X_train, kernel)
             p = pocket_perceptron(X_train_converted, Y_train, epochs)
 
@@ -157,14 +179,14 @@ def run_all_experiments(verbose=True):
             ein = np.sum(predicted != Y_train) / (Y_train.shape[0])
             # ein = np.sum(predicted != Y_train)
 
-            all_eins.append((vc, ein))
+            all_eins.append((n_param, ein))
 
             X_test_converted = convert_X(X_test, kernel)
             predicted = p.predict_batch(X_test_converted)
             eout = np.sum(predicted != Y_test) / (Y_test.shape[0])
             # eout = np.sum(predicted != Y_test)
 
-            all_eouts.append((vc, eout))
+            all_eouts.append((n_param, eout))
 
             if eout < min_eout:
                 min_eout = eout
@@ -182,6 +204,9 @@ def run_all_experiments(verbose=True):
     if verbose:
         plot_scatter(all_eins, all_eouts, a, b, c, d, noise)
         # plot_graphic(eins, eouts)
+
+    plot_hyperplanes(a, b, c, d, p, X_train, Y_train)
+    plot_hyperplanes(a, b, c, d, p, X_test, Y_test)
 
     return eins, eouts
 
@@ -215,7 +240,7 @@ def plot_scatter(all_eins, all_eouts, a, b, c, d, noise):
     ax.legend()
     ax.set_ylim([0, 1.])
     ax.set_ylabel('Error')
-    ax.set_xlabel('VC-dimension')
+    ax.set_xlabel('Number of parameters')
     ax.tick_params(axis='x', which='major', labelsize=8)
     # plt.xticks()
 
@@ -239,7 +264,7 @@ def plot_graphic(eins, eouts):
     if np.max(eouts) <= 1:
         ax.set_ylim([0, 1.])
     ax.set_ylabel('Error')
-    ax.set_xlabel('VC-dimension')
+    ax.set_xlabel('Number of parameters')
     ax.tick_params(axis='x', which='major', labelsize=8)
     # plt.xticks()
 
