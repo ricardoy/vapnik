@@ -1,13 +1,13 @@
-from mpl_toolkits.mplot3d import axes3d
-import matplotlib.pyplot as plt
 import numpy as np
 
 from tqdm import tqdm
 from vapnik.perceptron import Perceptron
-from vapnik.data_generator import get_plane_points, sample_points
+from vapnik.data_generator import sample_points
 from sklearn.model_selection import train_test_split
 
-DIMENSION = 4
+from visualization.plot import plot_hyperplanes, plot_scatter, plot_average_errors
+
+DIMENSION = 5
 
 va = np.array([True, 0, 0, 0], dtype=np.bool)
 vb = np.array([0, True, 0, 0], dtype=np.bool)
@@ -15,6 +15,10 @@ vc = np.array([0, 0, True, 0], dtype=np.bool)
 vd = np.array([0, 0, 0, True], dtype=np.bool)
 
 KERNELS = {
+    0: [
+        (('0x + 0y + 0z + 0'), [np.zeros(4, dtype=np.bool)])
+    ],
+
     1: [
         ('ax + 0y + 0z + 0', [va]),
         ('0x + ay + 0z + 0', [vb]),
@@ -104,11 +108,6 @@ def pocket_perceptron(X, Y, epochs):
     return p
 
 
-def plot_plane(a, b, c, d, ax, color):
-    x, y, z = get_plane_points(a, b, c, d)
-    ax.plot_surface(x, y, z, alpha=0.2, color=color)
-
-
 def convert_X(X, kernels):
     cols = []
     for kernel in kernels:
@@ -119,59 +118,57 @@ def convert_X(X, kernels):
     return result
 
 
-def plot_hyperplanes(a, b, c, d, p, X, Y):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    plot_plane(a, b, c, d, ax, 'r')
+def train_test_val_split(X, Y, train_size, validation_proportion):
+    n = X.shape[0]
+    X_train, X_test, Y_train, Y_test = \
+        train_test_split(X, Y, test_size=(n - train_size), stratify=Y)
+        # train_test_split(X, Y, test_size = (n - train_size), random_state = 42, stratify=Y)
 
-    a, b, c, d = p.weights
-    plot_plane(a, b, c, d, ax, 'g')
+    X_train, X_val, Y_train, Y_val = \
+        train_test_split(X_train, Y_train, test_size=validation_proportion, stratify=Y_train)
 
-    X_pos = X[Y == 1]
-    ax.scatter(X_pos[:,0], X_pos[:,1], X_pos[:,2], c='r', marker='o')
-    X_neg = X[Y == -1]
-    ax.scatter(X_neg[:,0], X_neg[:,1], X_neg[:,2], c='b', marker='^')
-    # print(z_pos)
-
-    ax.set_xlabel('X Label')
-    ax.set_ylabel('Y Label')
-    ax.set_zlabel('Z Label')
-
-    plt.show()
+    return X_train, X_test, X_val, Y_train, Y_test, Y_val
 
 
 def run_all_experiments(verbose=True):
     a = 1
-    b = 1
-    c = 1
-    d = 1
-    n = 4000
-    train_size = 20
+    b = 34
+    c = -3
+    d = -100
+    n = 1003
+    negative_proportion = 0.4
+    noise = 0.3
+
+    train_size = 30
+    validation_proportion = 0.3
+    epochs = 100
 
     if verbose:
         print('Objective: ', (a, b, c, d))
 
-    epochs = 100
-    noise = 0.
+    X, Y = generate_dataset(a, b, c, d, n, negative_proportion, noise)
 
-    X, Y = generate_dataset(a, b, c, d, n//2, noise)
-
-    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size = (n - train_size), random_state = 42, stratify=Y)
+    X_train, X_test, X_val, Y_train, Y_test, Y_val = \
+        train_test_val_split(X, Y, train_size, validation_proportion=validation_proportion)
 
     if verbose:
-        print('n', X.shape, 'train', X_train.shape, 'test', X_test.shape)
+        print('n', X.shape, 'train', X_train.shape, 'test', X_test.shape, 'val', X_val.shape)
 
     best_scores = []
     all_eins = []
     all_eouts = []
-    for n_param in [1, 2, 3, 4]:
+    all_evals = []
+    for n_param in [0, 1, 2, 3, 4]:
 
         if verbose:
             print('# parameters: %d' % (n_param))
 
         min_eout = float('inf')
         associated_ein = None
+        associated_eval = None
         for representation, kernel in KERNELS[n_param]:
+            # if np.sum(kernel) != 4:
+            #     continue
             X_train_converted = convert_X(X_train, kernel)
             p = pocket_perceptron(X_train_converted, Y_train, epochs)
 
@@ -188,105 +185,68 @@ def run_all_experiments(verbose=True):
 
             all_eouts.append((n_param, eout))
 
+            X_val_converted = convert_X(X_val, kernel)
+            predicted = p.predict_batch(X_val_converted)
+            eval = np.sum(predicted != Y_val) / (Y_val.shape[0])
+
+            all_evals.append((n_param, eval))
+
             if eout < min_eout:
                 min_eout = eout
                 associated_ein = ein
+                associated_eval = eval
+
 
             if verbose:
-                print('%s | ein: %.4f | eout: %.4f' % (representation, ein, eout), '|', p.weights)
+                print('%s | ein: %.4f | eval: %.4f |  eout: %.4f' % (representation, ein, eval, eout), '|', p.weights)
 
             # a, b, c, d = p.weights
-        best_scores.append((associated_ein, min_eout))
+        best_scores.append((associated_ein, associated_eval, min_eout))
 
     eins = np.array([x[0] for x in best_scores])
     eouts = np.array([x[1] for x in best_scores])
+    evals = np.array([x[2] for x in best_scores])
 
     if verbose:
-        plot_scatter(all_eins, all_eouts, a, b, c, d, noise)
+        plot_scatter(all_eins, all_evals, all_eouts, a, b, c, d, noise)
         # plot_graphic(eins, eouts)
 
-    plot_hyperplanes(a, b, c, d, p, X_train, Y_train)
-    plot_hyperplanes(a, b, c, d, p, X_test, Y_test)
+        plot_hyperplanes('Ein', a, b, c, d, p, X_train, Y_train)
+        plot_hyperplanes('Eval', a, b, c, d, p, X_val, Y_val)
+        plot_hyperplanes('Eout', a, b, c, d, p, X_test, Y_test)
 
-    return eins, eouts
+    return eins, evals, eouts
 
 
-def generate_dataset(a, b, c, d, n, noise):
-    x_pos, y_pos, z_pos = sample_points(a, b, c, d, n=n, side=1, noise=noise)
+def generate_dataset(a, b, c, d, n, negative_proportion, noise):
+    n_neg = int(n * negative_proportion)
+    n_pos = n - n_neg
+    x_pos, y_pos, z_pos = sample_points(a, b, c, d, n=n_pos, side=1, noise=noise)
     X_pos = np.stack((x_pos, y_pos, z_pos), axis=-1)
-    Y_pos = np.ones(n, dtype=np.int)
-    x_neg, y_neg, z_neg = sample_points(a, b, c, d, n=n, side=-1, noise=noise)
+    Y_pos = np.ones(n_pos, dtype=np.int)
+    x_neg, y_neg, z_neg = sample_points(a, b, c, d, n=n_neg, side=-1, noise=noise)
     X_neg = np.stack((x_neg, y_neg, z_neg), axis=-1)
-    Y_neg = -1 * np.ones(n, dtype=np.int)
+    Y_neg = -1 * np.ones(n_neg, dtype=np.int)
     X = np.concatenate((X_pos, X_neg), axis=0)
     Y = np.concatenate((Y_pos, Y_neg), axis=0)
-    ones = np.reshape(np.array(np.ones(2 * n)), (2 * n, 1))
+    ones = np.reshape(np.array(np.ones(n)), (n, 1))
     X = np.append(X, ones, axis=1)
     return X, Y
 
 
-def plot_scatter(all_eins, all_eouts, a, b, c, d, noise):
-    x = [t[0] for t in all_eins]
-    y = [t[1] for t in all_eins]
-
-    fig = plt.figure()
-    fig.suptitle('%.1fx %+.1fy %+.1fz %+.1f, noise=%.2f' % (a, b, c, d, noise))
-    ax = fig.add_subplot(111)
-    ax.scatter(x, y, label='Ein', marker='o', alpha=0.2)
-
-    y = [t[1] for t in all_eouts]
-    ax.scatter(x, y, label='Eout', marker='^', alpha=0.2)
-
-    ax.legend()
-    ax.set_ylim([0, 1.])
-    ax.set_ylabel('Error')
-    ax.set_xlabel('Number of parameters')
-    ax.tick_params(axis='x', which='major', labelsize=8)
-    # plt.xticks()
-
-    # for x, y in zip(interval, eouts):
-    #     ax.annotate('%.5f'%(y), xy=(x, y))
-    #
-    # for x, y in zip(interval, eins):
-    #     ax.annotate('%.5f'%(y), xy=(x, y))
-
-    plt.show()
-
-
-def plot_graphic(eins, eouts):
-    interval = [1, 2, 3, 4]
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(interval, eins, label='Ein', marker='o')
-    ax.plot(interval, eouts, label='Eout', marker='^')
-    # ay = fig.add_subplot(111)
-    ax.legend()
-    if np.max(eouts) <= 1:
-        ax.set_ylim([0, 1.])
-    ax.set_ylabel('Error')
-    ax.set_xlabel('Number of parameters')
-    ax.tick_params(axis='x', which='major', labelsize=8)
-    # plt.xticks()
-
-    for x, y in zip(interval, eouts):
-        ax.annotate('%.5f'%(y), xy=(x, y))
-
-    for x, y in zip(interval, eins):
-        ax.annotate('%.5f'%(y), xy=(x, y))
-
-    plt.show()
-
-
 def main():
     avg_eins = np.zeros(DIMENSION)
+    avg_evals = np.zeros(DIMENSION)
     avg_eouts = np.zeros(DIMENSION)
+
     n = 100
     for _ in tqdm(range(n)):
-        eins, eouts = run_all_experiments(False)
+        eins, evals, eouts = run_all_experiments(False)
         avg_eins = avg_eins + eins/n
         avg_eouts = avg_eouts + eouts/n
+        avg_evals = avg_evals + evals/n
 
-    plot_graphic(avg_eins, avg_eouts)
+    plot_average_errors(avg_eins, avg_evals, avg_eouts)
 
 
 if __name__ == '__main__':

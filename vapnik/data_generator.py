@@ -1,7 +1,7 @@
 import numpy as np
 
 
-K = 1000
+K = 10000
 
 
 def randrange(n, vmin, vmax):
@@ -29,6 +29,10 @@ def sample_points(a, b, c, d, side=1, noise=0.1, n=10):
     x = x + keep_label * distance_to_hyperplane * a
     y = y + keep_label * distance_to_hyperplane * b
     z = z + keep_label * distance_to_hyperplane * c
+
+    # x = x + keep_label * K * a
+    # y = y + keep_label * K * b
+    # z = z + keep_label * K * c
 
     return x, y, z
 

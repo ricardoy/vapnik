@@ -2,12 +2,12 @@ from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import numpy as np
 
-from vapnik.perceptron import PerceptronVC1
+from vapnik.perceptron import Perceptron
 from vapnik.data_generator import get_plane_points, sample_points
 
 
 def pocket_perceptron(X, Y, epochs):
-    p = PerceptronVC1(3)
+    p = Perceptron(4)
     best_result = -1
     best_weights = None
     for _ in range(epochs):
@@ -32,14 +32,14 @@ def plot_plane(a, b, c, d, ax, color):
 
 
 def main():
-    a = -1
-    b = -2
-    c = -2
-    d = 10
+    a = 1
+    b = 1
+    c = 1
+    d = 1
     n = 1000
 
-    epochs = 10
-    noise = 0.0
+    epochs = 1
+    noise = 0.1
 
     x_pos, y_pos, z_pos = sample_points(a, b, c, d, n=n, side=1, noise=noise)
     X_pos = np.stack((x_pos, y_pos, z_pos), axis=-1)
