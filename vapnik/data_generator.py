@@ -42,3 +42,19 @@ def get_plane_points(a, b, c, d):
     z = (-a*x -b*y -d) / c
 
     return x, y, z
+
+
+def generate_dataset(a, b, c, d, n, negative_proportion, noise):
+    n_neg = int(n * negative_proportion)
+    n_pos = n - n_neg
+    x_pos, y_pos, z_pos = sample_points(a, b, c, d, n=n_pos, side=1, noise=noise)
+    X_pos = np.stack((x_pos, y_pos, z_pos), axis=-1)
+    Y_pos = np.ones(n_pos, dtype=np.int)
+    x_neg, y_neg, z_neg = sample_points(a, b, c, d, n=n_neg, side=-1, noise=noise)
+    X_neg = np.stack((x_neg, y_neg, z_neg), axis=-1)
+    Y_neg = -1 * np.ones(n_neg, dtype=np.int)
+    X = np.concatenate((X_pos, X_neg), axis=0)
+    Y = np.concatenate((Y_pos, Y_neg), axis=0)
+    ones = np.reshape(np.array(np.ones(n)), (n, 1))
+    X = np.append(X, ones, axis=1)
+    return X, Y

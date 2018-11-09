@@ -36,8 +36,8 @@ def plot_scatter(all_eins, all_evals, all_eouts, a, b, c, d, noise):
     ax = fig.add_subplot(111)
     # ax.scatter(x, y, label='Ein', marker='o', alpha=0.2)
     #
-    # y = [t[1] for t in all_evals]
-    # ax.scatter(x, y, label='Eval', marker='*', alpha=0.2)
+    y = [t[1] for t in all_evals]
+    ax.scatter(x, y, label='Eval', marker='*', alpha=0.2)
 
     y = [t[1] for t in all_eouts]
     ax.scatter(x, y, label='Eout', marker='^', alpha=0.2)

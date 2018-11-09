@@ -1,8 +1,9 @@
 import numpy as np
 
+from abc import ABC, abstractmethod
 from tqdm import tqdm
 from vapnik.perceptron import Perceptron
-from vapnik.data_generator import sample_points
+from vapnik.data_generator import generate_dataset
 from sklearn.model_selection import train_test_split
 
 from visualization.plot import plot_hyperplanes, plot_scatter, plot_average_errors
@@ -130,29 +131,35 @@ def train_test_val_split(X, Y, train_size, validation_proportion):
     return X_train, X_test, X_val, Y_train, Y_test, Y_val
 
 
-def run_all_experiments(verbose=True):
+def run_all_experiments(verbose=True, leave_one_out_cv=False):
     a = 1
     b = 34
     c = -3
     d = -100
-    n = 1003
-    negative_proportion = 0.4
-    noise = 0.3
+    dataset_size = 1003
+    negative_proportion = 0.5
+    noise = 0.2
 
-    train_size = 30
+    train_size = 10
     validation_proportion = 0.3
     epochs = 100
 
     if verbose:
         print('Objective: ', (a, b, c, d))
 
-    X, Y = generate_dataset(a, b, c, d, n, negative_proportion, noise)
+    X, Y = generate_dataset(a, b, c, d, dataset_size, negative_proportion, noise)
 
-    X_train, X_test, X_val, Y_train, Y_test, Y_val = \
-        train_test_val_split(X, Y, train_size, validation_proportion=validation_proportion)
-
-    if verbose:
-        print('n', X.shape, 'train', X_train.shape, 'test', X_test.shape, 'val', X_val.shape)
+    if leave_one_out_cv:
+        n = X.shape[0]
+        X_train, X_test, Y_train, Y_test = \
+            train_test_split(X, Y, test_size=(n - train_size), stratify=Y)
+        if verbose:
+            print('n', X.shape, 'train', X_train.shape, 'test', X_test.shape)
+    else:
+        X_train, X_test, X_val, Y_train, Y_test, Y_val = \
+            train_test_val_split(X, Y, train_size, validation_proportion=validation_proportion)
+        if verbose:
+            print('n', X.shape, 'train', X_train.shape, 'test', X_test.shape, 'val', X_val.shape)
 
     best_scores = []
     all_eins = []
@@ -170,32 +177,53 @@ def run_all_experiments(verbose=True):
             # if np.sum(kernel) != 4:
             #     continue
             X_train_converted = convert_X(X_train, kernel)
-            p = pocket_perceptron(X_train_converted, Y_train, epochs)
+            if not leave_one_out_cv:
+                p = pocket_perceptron(X_train_converted, Y_train, epochs)
 
-            predicted = p.predict_batch(X_train_converted)
-            ein = np.sum(predicted != Y_train) / (Y_train.shape[0])
-            # ein = np.sum(predicted != Y_train)
+                predicted = p.predict_batch(X_train_converted)
+                ein = np.sum(predicted != Y_train) / (Y_train.shape[0])
+                all_eins.append((n_param, ein))
 
-            all_eins.append((n_param, ein))
+
+                X_val_converted = convert_X(X_val, kernel)
+                predicted = p.predict_batch(X_val_converted)
+                eval = np.sum(predicted != Y_val) / (Y_val.shape[0])
+                all_evals.append((n_param, eval))
+            else:
+                n = X_train.shape[0]
+
+                eval = 0
+                for i in range(n):
+                    p = pocket_perceptron(
+                        np.delete(X_train_converted, i, axis=0),
+                        np.delete(Y_train, i),
+                        epochs
+                    )
+
+                    predicted = p.predict(X_train_converted[i])
+                    if predicted != Y_train[i]:
+                        eval += 1
+
+                eval = eval / n
+                all_evals.append((n_param, eval))
+
+                # final model, train with all data
+                p = pocket_perceptron(X_train_converted, Y_train, epochs)
+
+                predicted = p.predict_batch(X_train_converted)
+                ein = np.sum(predicted != Y_train) / (Y_train.shape[0])
+                all_eins.append((n_param, ein))
+
 
             X_test_converted = convert_X(X_test, kernel)
             predicted = p.predict_batch(X_test_converted)
             eout = np.sum(predicted != Y_test) / (Y_test.shape[0])
-            # eout = np.sum(predicted != Y_test)
-
             all_eouts.append((n_param, eout))
-
-            X_val_converted = convert_X(X_val, kernel)
-            predicted = p.predict_batch(X_val_converted)
-            eval = np.sum(predicted != Y_val) / (Y_val.shape[0])
-
-            all_evals.append((n_param, eval))
 
             if eout < min_eout:
                 min_eout = eout
                 associated_ein = ein
                 associated_eval = eval
-
 
             if verbose:
                 print('%s | ein: %.4f | eval: %.4f |  eout: %.4f' % (representation, ein, eval, eout), '|', p.weights)
@@ -212,26 +240,11 @@ def run_all_experiments(verbose=True):
         # plot_graphic(eins, eouts)
 
         plot_hyperplanes('Ein', a, b, c, d, p, X_train, Y_train)
-        plot_hyperplanes('Eval', a, b, c, d, p, X_val, Y_val)
+        if not leave_one_out_cv:
+            plot_hyperplanes('Eval', a, b, c, d, p, X_val, Y_val)
         plot_hyperplanes('Eout', a, b, c, d, p, X_test, Y_test)
 
     return eins, evals, eouts
-
-
-def generate_dataset(a, b, c, d, n, negative_proportion, noise):
-    n_neg = int(n * negative_proportion)
-    n_pos = n - n_neg
-    x_pos, y_pos, z_pos = sample_points(a, b, c, d, n=n_pos, side=1, noise=noise)
-    X_pos = np.stack((x_pos, y_pos, z_pos), axis=-1)
-    Y_pos = np.ones(n_pos, dtype=np.int)
-    x_neg, y_neg, z_neg = sample_points(a, b, c, d, n=n_neg, side=-1, noise=noise)
-    X_neg = np.stack((x_neg, y_neg, z_neg), axis=-1)
-    Y_neg = -1 * np.ones(n_neg, dtype=np.int)
-    X = np.concatenate((X_pos, X_neg), axis=0)
-    Y = np.concatenate((Y_pos, Y_neg), axis=0)
-    ones = np.reshape(np.array(np.ones(n)), (n, 1))
-    X = np.append(X, ones, axis=1)
-    return X, Y
 
 
 def main():
@@ -251,4 +264,4 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    run_all_experiments()
+    run_all_experiments(leave_one_out_cv=True)
