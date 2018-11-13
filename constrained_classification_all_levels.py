@@ -1,4 +1,6 @@
+import argparse
 import numpy as np
+import sys
 
 from abc import ABC, abstractmethod
 from tqdm import tqdm
@@ -131,14 +133,14 @@ def train_test_val_split(X, Y, train_size, validation_proportion):
     return X_train, X_test, X_val, Y_train, Y_test, Y_val
 
 
-def run_all_experiments(verbose=True, leave_one_out_cv=False):
+def run_all_experiments(verbose=True, leave_one_out_cv=False, chain=None):
     a = 1
     b = 34
     c = -3
     d = -100
-    dataset_size = 1003
+    dataset_size = 2003
     negative_proportion = 0.5
-    noise = 0.2
+    noise = 0.3
 
     train_size = 10
     validation_proportion = 0.3
@@ -173,7 +175,10 @@ def run_all_experiments(verbose=True, leave_one_out_cv=False):
         min_eout = float('inf')
         associated_ein = None
         associated_eval = None
-        for representation, kernel in KERNELS[n_param]:
+        for i, (representation, kernel) in enumerate(KERNELS[n_param]):
+            if chain is not None:
+                if int(chain[n_param]) != i:
+                    continue
             # if np.sum(kernel) != 4:
             #     continue
             X_train_converted = convert_X(X_train, kernel)
@@ -228,7 +233,7 @@ def run_all_experiments(verbose=True, leave_one_out_cv=False):
             if verbose:
                 print('%s | ein: %.4f | eval: %.4f |  eout: %.4f' % (representation, ein, eval, eout), '|', p.weights)
 
-            # a, b, c, d = p.weights
+
         best_scores.append((associated_ein, associated_eval, min_eout))
 
     eins = np.array([x[0] for x in best_scores])
@@ -247,21 +252,50 @@ def run_all_experiments(verbose=True, leave_one_out_cv=False):
     return eins, evals, eouts
 
 
-def main():
+def main(chain):
     avg_eins = np.zeros(DIMENSION)
     avg_evals = np.zeros(DIMENSION)
     avg_eouts = np.zeros(DIMENSION)
 
     n = 100
     for _ in tqdm(range(n)):
-        eins, evals, eouts = run_all_experiments(False)
+        eins, evals, eouts = run_all_experiments(False, leave_one_out_cv=True, chain=chain)
         avg_eins = avg_eins + eins/n
         avg_eouts = avg_eouts + eouts/n
         avg_evals = avg_evals + evals/n
 
-    plot_average_errors(avg_eins, avg_evals, avg_eouts)
+    if chain is None:
+        plot_average_errors(avg_eins, avg_evals, avg_eouts)
+    else:
+        x_axis = []
+        for n_param in range(len(KERNELS)):
+            for i, (representation, _) in enumerate(KERNELS[n_param]):
+                if int(chain[n_param]) == i:
+                    x_axis.append(representation)
+                    break
+        plot_average_errors(avg_eins, avg_evals, avg_eouts, x_axis=x_axis, x_label='Models')
+
+
+def show_kernel():
+    for nparam in range(len(KERNELS)):
+        print('\nlevel %d' % (nparam))
+        for i, (representation, _) in enumerate(KERNELS[nparam]):
+            print('%2d %s' % (i, representation))
 
 
 if __name__ == '__main__':
-    # main()
-    run_all_experiments(leave_one_out_cv=True)
+    parser = argparse.ArgumentParser('U-Curve model selection')
+    parser.add_argument('--show-kernel', action='store_true', default=False)
+    parser.add_argument('--detailed', action='store_true', default=False)
+    parser.add_argument('--chain', nargs=len(KERNELS))
+
+    args = parser.parse_args()
+
+    if args.show_kernel:
+        show_kernel()
+    elif args.detailed:
+        run_all_experiments(leave_one_out_cv=True)
+    else:
+        print('main')
+        main(args.chain)
+

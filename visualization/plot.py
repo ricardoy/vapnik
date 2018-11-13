@@ -58,8 +58,11 @@ def plot_scatter(all_eins, all_evals, all_eouts, a, b, c, d, noise):
     plt.show()
 
 
-def plot_average_errors(eins, evals, eouts):
-    interval = [0, 1, 2, 3, 4]
+def plot_average_errors(eins, evals, eouts, x_axis=None, x_label=None):
+    if x_axis is None:
+        interval = ['0', '1', '2', '3', '4']
+    else:
+        interval = x_axis
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(interval, eins, label='Ein', marker='o')
@@ -70,7 +73,10 @@ def plot_average_errors(eins, evals, eouts):
     if np.max(eouts) <= 1:
         ax.set_ylim([0, 1.])
     ax.set_ylabel('Error')
-    ax.set_xlabel('Number of parameters')
+    if x_label is None:
+        ax.set_xlabel('Number of parameters')
+    else:
+        ax.set_xlabel('Models')
     ax.tick_params(axis='x', which='major', labelsize=8)
     # plt.xticks()
 
