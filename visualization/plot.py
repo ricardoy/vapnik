@@ -59,12 +59,12 @@ def plot_scatter(all_eins, all_evals, all_eouts, a, b, c, d, noise):
 
 
 def plot_average_errors(eins, evals, eouts):
-    interval = [1, 2, 3, 4]
+    interval = [0, 1, 2, 3, 4]
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(interval, eins, label='Ein', marker='o')
     ax.plot(interval, eouts, label='Eout', marker='^')
-    ax.plot(interval, evals, label='Eout', marker='_')
+    ax.plot(interval, evals, label='Eval', marker='_')
     # ay = fig.add_subplot(111)
     ax.legend()
     if np.max(eouts) <= 1:
